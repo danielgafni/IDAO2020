@@ -30,7 +30,7 @@ class CustomDataset(Dataset):
         return self.len
 
     def __getitem__(self, item):
-        return self.x[item:item + self.seq_len], self.y[item + self.seq_len - 1]
+        return self.x[item:item + self.seq_len], self.y[item:item + self.seq_len]
 
 
 def spherical_from_cartesian(data):

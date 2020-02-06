@@ -22,29 +22,31 @@ class BaselineNN(nn.Module):
 
 
 class LSTM(nn.Module):
-    def __init__(self, hidden_dim, input_dim=13, seq_len=5):
+    def __init__(self, hidden_dim, input_dim=13, seq_len=10, num_layers=1, batch_size=10):
         super(LSTM, self).__init__()
         self.input_dim = input_dim
+        self.seq_len = seq_len
         self.hidden_dim = hidden_dim
-        self.lstm = torch.nn.LSTM(self.input_dim, self.hidden_dim, batch_first=True)
-        self.linear1 = torch.nn.Linear(seq_len * hidden_dim, 6)
-        self.tanh = nn.Tanh()
-        self.linear2 = nn.Linear(6, 6)
-        self.linear2.weight.data.fill_(15000)
+        self.num_layers = num_layers
+        self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True, dropout=0.2)
+        self.hidden_cell = (torch.zeros(2, seq_len, hidden_dim),
+                            torch.zeros(2, seq_len, hidden_dim))
+        self.linear = nn.Linear(hidden_dim * seq_len, 6)
 
     def forward(self, input_seq):
-        batch_size = input_seq.size(0)
-        lstm_out, _ = self.lstm(input_seq)
-        # predictions = self.linear1()
-        # predictions = self.tanh(predictions)
-        predictions = self.linear1(lstm_out.reshape(batch_size, -1))
+        lstm_out, self.hidden_cell = self.lstm(input_seq.view(input_seq.size(1), input_seq.size(0), -1),
+                                               self.hidden_cell)
+        out = lstm_out.permute(1, 0, 2)
+        predictions = self.linear(out.view(input_seq.size(0), -1))
+        return predictions[-1]
 
-        return predictions
+    def init_hidden_cell(self):
+        self.hidden_cell = (torch.zeros(self.num_layers, self.seq_len, self.hidden_dim),
+                            torch.zeros(self.num_layers, self.seq_len, self.hidden_dim))
 
 
 class BasicBlock(nn.Module):
     expansion = 1
-
     def __init__(self, in_planes, planes, stride=1):
         super(BasicBlock, self).__init__()
         self.conv1 = nn.Conv1d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
