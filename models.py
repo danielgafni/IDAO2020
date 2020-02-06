@@ -38,7 +38,7 @@ class LSTM(nn.Module):
                                                self.hidden_cell)
         out = lstm_out.permute(1, 0, 2)
         predictions = self.linear(out.view(input_seq.size(0), -1))
-        return predictions[-1]
+        return predictions
 
     def init_hidden_cell(self):
         self.hidden_cell = (torch.zeros(self.num_layers, self.seq_len, self.hidden_dim),
