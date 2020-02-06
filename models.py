@@ -31,13 +31,16 @@ class LSTM(nn.Module):
         self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True, dropout=0.2)
         self.hidden_cell = (torch.zeros(2, seq_len, hidden_dim),
                             torch.zeros(2, seq_len, hidden_dim))
+        self.tanh = nn.Tanh()
         self.linear = nn.Linear(hidden_dim * seq_len, 6)
 
     def forward(self, input_seq):
         lstm_out, self.hidden_cell = self.lstm(input_seq.view(input_seq.size(1), input_seq.size(0), -1),
                                                self.hidden_cell)
         out = lstm_out.permute(1, 0, 2)
+        out = self.tanh(out)
         predictions = self.linear(out.view(input_seq.size(0), -1))
+        predictions[:, :3] *= 10000
         return predictions
 
     def init_hidden_cell(self):
