@@ -11,9 +11,7 @@ from models import LSTM
 
 features = ['epoch',
             'x_sim', 'y_sim', 'z_sim', 'Vx_sim', 'Vy_sim', 'Vz_sim',
-            'ro_sim', 'theta_sim', 'fi_sim', 'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim',
-            'dx_sim', 'dy_sim', 'dz_sim',
-            'dro_sim', 'dtheta_sim', 'dfi_sim']
+            'dx_sim', 'dy_sim', 'dz_sim']
 targets = ['x', 'y', 'z', 'Vx', 'Vy', 'Vz']
 
 
@@ -50,16 +48,6 @@ class PredictSequenceDataset(Dataset):
         return self.x[item:item + self.seq_len]
 
 
-def spherical_from_cartesian(data):
-    data['ro_sim'] = np.sqrt(data['x_sim'] ** 2 + data['y_sim'] ** 2 + data['z_sim'] ** 2)
-    data['theta_sim'] = np.arccos(data['x_sim'] / data['ro_sim'])
-    data['fi_sim'] = np.arctan(data['z_sim'] / data['y_sim'])
-    data['dro/dt_sim'] = (data['Vx_sim'] * data['x_sim'] + data['Vy_sim'] * data['y_sim'] + data['Vz_sim'] * data['z_sim']) / data['ro_sim']
-    data['dtheta/dt_sim'] = (data['Vx_sim'] * data['y_sim'] - data['Vy_sim'] * data['x_sim']) / np.sqrt(data['x_sim'] ** 2 + data['y_sim'] ** 2)
-    data['dfi/dt_sim'] = ((data['z_sim'] * (data['x_sim'] * data['Vx_sim'] + data['y_sim'] * data['Vy_sim']) - (data['x_sim'] ** 2 + data['y_sim'] ** 2) * data['Vz_sim'])
-                          /(data['ro_sim'] ** 2 * np.sqrt(data['x_sim'] ** 2 + data['y_sim'] ** 2)))
-    return data
-
 
 def process_for_train_test(data):
     data = data.drop(['id'], axis=1)
@@ -67,13 +55,11 @@ def process_for_train_test(data):
     data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
     data['epoch'] = (data['epoch'] - data['epoch'].min())
 
-    # generate spherical coordinates features
-    data = spherical_from_cartesian(data)
     # generate delta features
     dt = data['epoch'].values[1] - data['epoch'].values[0]
     data[['dx_sim', 'dy_sim', 'dz_sim',
-          'dro_sim', 'dtheta_sim', 'dfi_sim']] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
-                                                            'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim']]
+          ]] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
+            ]]
 
     # Scale features
     data_to_scale = data.drop(['sat_id', 'x', 'y', 'z', 'Vx', 'Vy', 'Vz'], axis=1)
@@ -101,13 +87,11 @@ def process_for_predict(data):
     # Convert date and time to seconds
     data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
     data['epoch'] = (data['epoch'] - data['epoch'].min())
-    # generate spherical coordinates features
-    data = spherical_from_cartesian(data)
     # generate delta features
     dt = data['epoch'].values[1] - data['epoch'].values[0]
     data[['dx_sim', 'dy_sim', 'dz_sim',
-          'dro_sim', 'dtheta_sim', 'dfi_sim']] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
-                                                            'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim']]
+          ]] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
+                                                            ]]
     # Scale features
     data_to_scale = data.drop(['id', 'sat_id'], axis=1)
     scaler = StandardScaler()
@@ -128,13 +112,11 @@ def process_for_train(data):
     data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
     data['epoch'] = (data['epoch'] - data['epoch'].min())
 
-    # generate spherical coordinates features
-    data = spherical_from_cartesian(data)
     # generate delta features
     dt = data['epoch'].values[1] - data['epoch'].values[0]
     data[['dx_sim', 'dy_sim', 'dz_sim',
-          'dro_sim', 'dtheta_sim', 'dfi_sim']] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
-                                                            'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim']]
+          ]] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
+                                                            ]]
 
     # Scale features
     data_to_scale = data.drop(['sat_id'] + targets, axis=1)
@@ -162,5 +144,7 @@ def make_prediction(data, sat_id):
             # predicted_seq = model(seq_x)
             predicted_seq = torch.rand(6)
             predictions[-i - len(data):-i, :] = predicted_seq
-    print(predictions.shape)
+    print('--------------------------')
+    print(f'Predictions len: {len(data)}')
+    print(f'Real len: {len(prediction_dataset)}')
     return predictions
