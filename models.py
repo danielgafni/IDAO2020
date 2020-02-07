@@ -3,45 +3,33 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class BaselineNN(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(BaselineNN, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size)
-        self.tanh1 = torch.nn.Tanh()
-        self.fc2 = torch.nn.Linear(self.hidden_size, 6)
-        self.tanh2 = torch.nn.Tanh()
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.tanh1(x)
-        x = self.fc2(x)
-        x = self.tanh2(x)
-        return x
-
-
 class LSTM(nn.Module):
-    def __init__(self, hidden_dim, input_dim=13, seq_len=10, num_layers=1, batch_size=10):
+    def __init__(self, hidden_dim, input_dim=19, seq_len=10, num_layers=1, batch_size=10):
         super(LSTM, self).__init__()
+        # self.batchnorm = nn.BatchNorm1d(13)
         self.input_dim = input_dim
         self.seq_len = seq_len
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
-        self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True, dropout=0.2)
+        self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True)
         self.hidden_cell = (torch.zeros(2, seq_len, hidden_dim),
                             torch.zeros(2, seq_len, hidden_dim))
+        # self.dropout = nn.Dropout(p=0.2)
         self.tanh = nn.Tanh()
         self.linear = nn.Linear(hidden_dim * seq_len, 6)
 
     def forward(self, input_seq):
+        # input_seq = input_seq.permute(0, 2, 1)
+        # input_seq = self.batchnorm(input_seq)
+        # input_seq = input_seq.permute(0, 2, 1)
         lstm_out, self.hidden_cell = self.lstm(input_seq.view(input_seq.size(1), input_seq.size(0), -1),
                                                self.hidden_cell)
         out = lstm_out.permute(1, 0, 2)
         out = self.tanh(out)
-        predictions = self.linear(out.view(input_seq.size(0), -1))
-        predictions[:, :3] *= 10000
-        return predictions
+        # out = self.dropout(out)
+        out = self.linear(out.view(input_seq.size(0), -1))
+        out[:, :3] *= 10000
+        return out
 
     def init_hidden_cell(self):
         self.hidden_cell = (torch.zeros(self.num_layers, self.seq_len, self.hidden_dim),

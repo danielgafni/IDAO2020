@@ -9,7 +9,9 @@ from sklearn.preprocessing import StandardScaler
 
 features = ['epoch',
             'x_sim', 'y_sim', 'z_sim', 'Vx_sim', 'Vy_sim', 'Vz_sim',
-            'ro_sim', 'theta_sim', 'fi_sim', 'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim']
+            'ro_sim', 'theta_sim', 'fi_sim', 'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim',
+            'dx_sim', 'dy_sim', 'dz_sim',
+            'dro_sim', 'dtheta_sim', 'dfi_sim']
 targets = ['x', 'y', 'z', 'Vx', 'Vy', 'Vz']
 
 
@@ -19,7 +21,7 @@ def smape(satellite_predicted_values, satellite_true_values):
                           / (torch.abs(satellite_predicted_values) + torch.abs(satellite_true_values))))
 
 
-class CustomDataset(Dataset):
+class TrainTestSequenceDataset(Dataset):
     def __init__(self, data_train: pd.DataFrame, data_test: pd.DataFrame, seq_len=2):
         self.len = len(data_train) - (seq_len - 1)
         self.seq_len = seq_len
@@ -33,6 +35,19 @@ class CustomDataset(Dataset):
         return self.x[item:item + self.seq_len], self.y[item:item + self.seq_len]
 
 
+class PredictSequenceDataset(Dataset):
+    def __init__(self, data: pd.DataFrame, seq_len=2):
+        self.len = len(data) - (seq_len - 1)
+        self.seq_len = seq_len
+        self.x = torch.from_numpy(data.values).float()
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, item):
+        return self.x[item:item + self.seq_len]
+
+
 def spherical_from_cartesian(data):
     data['ro_sim'] = np.sqrt(data['x_sim'] ** 2 + data['y_sim'] ** 2 + data['z_sim'] ** 2)
     data['theta_sim'] = np.arccos(data['x_sim'] / data['ro_sim'])
@@ -44,15 +59,20 @@ def spherical_from_cartesian(data):
     return data
 
 
-def process(data):
+def process_for_train(data):
     data = data.drop(['id'], axis=1)
-    # Convert coordinates
-    # data = spherical_from_cartesian(data)
     # Convert date and time to seconds
     data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
     data['epoch'] = (data['epoch'] - data['epoch'].min())
+
     # generate spherical coordinates features
     data = spherical_from_cartesian(data)
+    # generate delta features
+    dt = data['epoch'].values[1] - data['epoch'].values[0]
+    data[['dx_sim', 'dy_sim', 'dz_sim',
+          'dro_sim', 'dtheta_sim', 'dfi_sim']] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
+                                                            'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim']]
+
     # Scale features
     data_to_scale = data.drop(['sat_id', 'x', 'y', 'z', 'Vx', 'Vy', 'Vz'], axis=1)
     scaler = StandardScaler()
@@ -72,3 +92,29 @@ def process(data):
         sat_datas_train.append(sat_data_train)
         sat_datas_test.append(sat_data_test)
     return sat_datas_train, sat_datas_test
+
+
+def process_for_predict(data):
+    # Convert coordinates
+    # Convert date and time to seconds
+    data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
+    data['epoch'] = (data['epoch'] - data['epoch'].min())
+    # generate spherical coordinates features
+    data = spherical_from_cartesian(data)
+    # generate delta features
+    dt = data['epoch'].values[1] - data['epoch'].values[0]
+    data[['dx_sim', 'dy_sim', 'dz_sim',
+          'dro_sim', 'dtheta_sim', 'dfi_sim']] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
+                                                            'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim']]
+    # Scale features
+    data_to_scale = data.drop(['id', 'sat_id'], axis=1)
+    scaler = StandardScaler()
+    scaler.fit(data_to_scale)
+    data_scaled = scaler.transform(data_to_scale)
+    data[features] = data_scaled
+    # Split by satellite id
+    sat_datas = []
+    data_grouped = data.groupby('sat_id')
+    for sat_data in data_grouped:
+        sat_datas.append(sat_data[1])
+    return sat_datas
