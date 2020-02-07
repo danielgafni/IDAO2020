@@ -6,6 +6,8 @@ from torch.utils.data import Dataset, DataLoader
 import plotly.graph_objs as go
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from models import LSTM
+
 
 features = ['epoch',
             'x_sim', 'y_sim', 'z_sim', 'Vx_sim', 'Vy_sim', 'Vz_sim',
@@ -18,7 +20,7 @@ targets = ['x', 'y', 'z', 'Vx', 'Vy', 'Vz']
 def smape(satellite_predicted_values, satellite_true_values):
     # Score function
     return torch.mean(torch.abs((satellite_predicted_values - satellite_true_values)
-                          / (torch.abs(satellite_predicted_values) + torch.abs(satellite_true_values))))
+                          / (torch.abs(satellite_predicted_values) + torch.abs(satellite_true_values))), axis=1)
 
 
 class TrainTestSequenceDataset(Dataset):
@@ -36,7 +38,7 @@ class TrainTestSequenceDataset(Dataset):
 
 
 class PredictSequenceDataset(Dataset):
-    def __init__(self, data: pd.DataFrame, seq_len=2):
+    def __init__(self, data: pd.DataFrame, seq_len=20):
         self.len = len(data) - (seq_len - 1)
         self.seq_len = seq_len
         self.x = torch.from_numpy(data.values).float()
@@ -118,3 +120,19 @@ def process_for_predict(data):
     for sat_data in data_grouped:
         sat_datas.append(sat_data[1])
     return sat_datas
+
+
+def make_prediction(data, sat_id):
+    # model = torch.load(f'models//{sat_id}//model.pt')
+    prediction_dataset = PredictSequenceDataset(data, seq_len=20)
+    prediction_dataloader = DataLoader(prediction_dataset, batch_size=1, shuffle=False)
+    predictions = torch.zeros(len(data), 6)
+    with torch.no_grad():
+        for i in range(len(data) - 12, 0, -1):
+            seq_x = prediction_dataset[i]
+            seq_x = seq_x.unsqueeze(0)
+            # predicted_seq = model(seq_x)
+            predicted_seq = torch.rand(6)
+            predictions[-i - len(data):-i, :] = predicted_seq
+    print(predictions.shape)
+    return predictions

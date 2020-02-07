@@ -11,12 +11,12 @@ class LSTM(nn.Module):
         self.seq_len = seq_len
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
-        self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True)
+        self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers=num_layers, batch_first=True, dropout=0.1)
         self.hidden_cell = (torch.zeros(2, seq_len, hidden_dim),
                             torch.zeros(2, seq_len, hidden_dim))
-        # self.dropout = nn.Dropout(p=0.2)
-        self.tanh = nn.Tanh()
-        self.linear = nn.Linear(hidden_dim * seq_len, 6)
+        self.dropout = nn.Dropout(p=0.1)
+        self.activation = nn.ReLU()
+        self.linear = nn.Linear(hidden_dim, 6)
 
     def forward(self, input_seq):
         # input_seq = input_seq.permute(0, 2, 1)
@@ -25,10 +25,10 @@ class LSTM(nn.Module):
         lstm_out, self.hidden_cell = self.lstm(input_seq.view(input_seq.size(1), input_seq.size(0), -1),
                                                self.hidden_cell)
         out = lstm_out.permute(1, 0, 2)
-        out = self.tanh(out)
-        # out = self.dropout(out)
-        out = self.linear(out.view(input_seq.size(0), -1))
-        out[:, :3] *= 10000
+        out = self.activation(out)
+        out = self.dropout(out)
+        out = self.linear(out)
+        out[:, :, :3] *= 10000
         return out
 
     def init_hidden_cell(self):
