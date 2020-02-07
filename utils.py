@@ -61,7 +61,7 @@ def spherical_from_cartesian(data):
     return data
 
 
-def process_for_train(data):
+def process_for_train_test(data):
     data = data.drop(['id'], axis=1)
     # Convert date and time to seconds
     data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
@@ -119,6 +119,34 @@ def process_for_predict(data):
     data_grouped = data.groupby('sat_id')
     for sat_data in data_grouped:
         sat_datas.append(sat_data[1])
+    return sat_datas
+
+
+def process_for_train(data):
+    data = data.drop(['id'], axis=1)
+    # Convert date and time to seconds
+    data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
+    data['epoch'] = (data['epoch'] - data['epoch'].min())
+
+    # generate spherical coordinates features
+    data = spherical_from_cartesian(data)
+    # generate delta features
+    dt = data['epoch'].values[1] - data['epoch'].values[0]
+    data[['dx_sim', 'dy_sim', 'dz_sim',
+          'dro_sim', 'dtheta_sim', 'dfi_sim']] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
+                                                            'dro/dt_sim', 'dtheta/dt_sim', 'dfi/dt_sim']]
+
+    # Scale features
+    data_to_scale = data.drop(['sat_id'] + targets, axis=1)
+    scaler = StandardScaler()
+    scaler.fit(data_to_scale)
+    data_scaled = scaler.transform(data_to_scale)
+    data[features] = data_scaled
+    # Split by satellite id
+    sat_datas = []
+    data_grouped = data.groupby('sat_id')
+    for sat_data in data_grouped:
+        sat_datas.append(sat_data[1].drop(['sat_id'], axis=1))
     return sat_datas
 
 
