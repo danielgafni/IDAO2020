@@ -3,8 +3,9 @@ import torch.nn as nn
 
 
 class LSTM(nn.Module):
-    def __init__(self, hidden_dim, input_dim=19, seq_len=10, num_layers=1, batch_size=10):
+    def __init__(self, hidden_dim, input_dim=19, seq_len=10, num_layers=1, batch_size=10, device=torch.device('cuda')):
         super(LSTM, self).__init__()
+        self.device = device
         self.input_dim = input_dim
         self.seq_len = seq_len
         self.hidden_dim = hidden_dim
@@ -17,6 +18,7 @@ class LSTM(nn.Module):
         self.linear = nn.Linear(hidden_dim, 6)
 
     def forward(self, input_seq):
+        input_seq = input_seq.to(self.device)
         lstm_out, self.hidden_cell = self.lstm(input_seq.view(input_seq.size(1), input_seq.size(0), -1),
                                                self.hidden_cell)
         out = lstm_out.permute(1, 0, 2)
@@ -27,5 +29,5 @@ class LSTM(nn.Module):
         return out
 
     def init_hidden_cell(self):
-        self.hidden_cell = (torch.zeros(self.num_layers, self.seq_len, self.hidden_dim),
-                            torch.zeros(self.num_layers, self.seq_len, self.hidden_dim))
+        self.hidden_cell = (torch.zeros(self.num_layers, self.seq_len, self.hidden_dim).to(self.device),
+                            torch.zeros(self.num_layers, self.seq_len, self.hidden_dim).to(self.device))
