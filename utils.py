@@ -104,7 +104,6 @@ def process_for_predict(data):
 
         if not os.path.exists(f'models//{sat_id}'):
             os.makedirs(f'models//{sat_id}')
-        torch.save(scaler, f'models//{sat_id}//StandardScaler')
 
     return sat_datas_predict
 
@@ -134,7 +133,7 @@ def process_for_train(data):
 
         if not os.path.exists(f'models//{sat_id}'):
             os.makedirs(f'models//{sat_id}')
-        torch.save(scaler, f'models//{sat_id}//StandardScaler-full')
+        torch.save(scaler, f'models//{sat_id}//StandardScaler-full_train')
 
     return sat_datas_train
 
