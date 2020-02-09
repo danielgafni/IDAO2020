@@ -58,13 +58,12 @@ def process_for_train_test(data):
         sat_data.drop('sat_id', axis=1, inplace=True)
         sat_data.loc[:, 'epoch'] = sat_data['epoch'].apply(lambda x: x.timestamp())
         #  Convert epoch to time delta between observations
-        sat_data.loc[:, 'dt'] = np.abs(sat_data.loc[:, 'epoch'].diff())
+        sat_data.loc[:, 'dt'] = np.abs(sat_data.loc[:, 'epoch'].diff()) * np.arange(1, len(sat_data) + 1)
         sat_data.drop('epoch', axis=1, inplace=True)
         sat_data.iat[0, -1] = sat_data.iat[1, -1]
         sat_data.loc[:, 'dx_sim'] = sat_data.loc[:, 'Vx_sim'].mul(sat_data.loc[:, 'dt'])
         sat_data.loc[:, 'dy_sim'] = sat_data.loc[:, 'Vy_sim'].mul(sat_data.loc[:, 'dt'])
         sat_data.loc[:, 'dz_sim'] = sat_data.loc[:, 'Vz_sim'].mul(sat_data.loc[:, 'dt'])
-        sat_data[targets + features] = sat_data[targets + features]
         sat_data_train, sat_data_test = train_test_split(sat_data.drop('id', axis=1), shuffle=False)
         scaler = StandardScaler(copy=False)
         scaler.fit(sat_data_train.loc[:, features])
@@ -82,54 +81,62 @@ def process_for_train_test(data):
 
 
 def process_for_predict(data):
-    # Convert coordinates
-    # Convert date and time to seconds
-    data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
-    data['epoch'] = (data['epoch'] - data['epoch'].min())
-    # generate delta features
-    dt = data['epoch'].values[1] - data['epoch'].values[0]
-    data[['dx_sim', 'dy_sim', 'dz_sim',
-          ]] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
-                                                            ]]
-    # Scale features
-    data_to_scale = data.drop(['id', 'sat_id'], axis=1)
-    scaler = StandardScaler()
-    scaler.fit(data_to_scale)
-    data_scaled = scaler.transform(data_to_scale)
-    data[features] = data_scaled
-    # Split by satellite id
-    sat_datas = {}
+    #  Separate different satellites
     data_grouped = data.groupby('sat_id')
-    for sat_data in data_grouped:
-        sat_id = sat_data[1]['sat_id'].iloc[0]
-        sat_datas[sat_id] = sat_data[1].drop(['sat_id'], axis=1)
-    return sat_datas
+    sat_datas_predict = {}
+    for sat_id, sat_data in data_grouped:
+        sat_data.drop('sat_id', axis=1, inplace=True)
+        sat_data.loc[:, 'epoch'] = sat_data['epoch'].apply(lambda x: x.timestamp())
+        #  Convert epoch to time delta between observations
+        sat_data.loc[:, 'dt'] = np.abs(sat_data.loc[:, 'epoch'].diff())
+        sat_data.iat[0, -1] = sat_data.iat[1, -1]
+        sat_data.drop('epoch', axis=1, inplace=True)
+
+        sat_data.loc[:, 'dx_sim'] = sat_data.loc[:, 'Vx_sim'].mul(sat_data.loc[:, 'dt'])
+        sat_data.loc[:, 'dy_sim'] = sat_data.loc[:, 'Vy_sim'].mul(sat_data.loc[:, 'dt'])
+        sat_data.loc[:, 'dz_sim'] = sat_data.loc[:, 'Vz_sim'].mul(sat_data.loc[:, 'dt'])
+        sat_data.loc[:, 'dt'] = sat_data.loc[:, 'dt'].mul(np.arange(1, len(sat_data) + 1))
+
+        scaler = torch.load(f'models//{sat_id}//StandardScaler-full')
+        sat_data.loc[:, features] = scaler.transform(sat_data.loc[:, features])
+
+        sat_datas_predict[sat_id] = sat_data
+
+        if not os.path.exists(f'models//{sat_id}'):
+            os.makedirs(f'models//{sat_id}')
+        torch.save(scaler, f'models//{sat_id}//StandardScaler')
+
+    return sat_datas_predict
 
 
 def process_for_train(data):
-    data = data.drop(['id'], axis=1)
-    # Convert date and time to seconds
-    data['epoch'] = data['epoch'].apply(lambda x: x.to_pydatetime().timestamp())
-    data['epoch'] = (data['epoch'] - data['epoch'].min())
-
-    # generate delta features
-    dt = data['epoch'].values[1] - data['epoch'].values[0]
-    data[['dx_sim', 'dy_sim', 'dz_sim',
-          ]] = dt * data[['Vx_sim', 'Vy_sim', 'Vz_sim',
-                                                            ]]
-
-    # Scale features
-    data_to_scale = data.drop(['sat_id'] + targets, axis=1)
-    scaler = StandardScaler()
-    scaler.fit(data_to_scale)
-    data_scaled = scaler.transform(data_to_scale)
-    data[features] = data_scaled
-    # Split by satellite id
-    sat_datas = []
+    #  Separate different satellites
     data_grouped = data.groupby('sat_id')
-    for sat_data in data_grouped:
-        sat_datas.append(sat_data[1].drop(['sat_id'], axis=1))
-    return sat_datas
+    sat_datas_train = {}
+    for sat_id, sat_data in data_grouped:
+        sat_data.drop('sat_id', axis=1, inplace=True)
+        sat_data.loc[:, 'epoch'] = sat_data['epoch'].apply(lambda x: x.timestamp())
+        #  Convert epoch to time delta between observations
+        sat_data.loc[:, 'dt'] = np.abs(sat_data.loc[:, 'epoch'].diff())
+        sat_data.iat[0, -1] = sat_data.iat[1, -1]
+        sat_data.drop('epoch', axis=1, inplace=True)
+
+        sat_data.loc[:, 'dx_sim'] = sat_data.loc[:, 'Vx_sim'].mul(sat_data.loc[:, 'dt'])
+        sat_data.loc[:, 'dy_sim'] = sat_data.loc[:, 'Vy_sim'].mul(sat_data.loc[:, 'dt'])
+        sat_data.loc[:, 'dz_sim'] = sat_data.loc[:, 'Vz_sim'].mul(sat_data.loc[:, 'dt'])
+        sat_data.loc[:, 'dt'] = sat_data.loc[:, 'dt'].mul(np.arange(1, len(sat_data) + 1))
+
+        scaler = StandardScaler(copy=False)
+        scaler.fit(sat_data.loc[:, features])
+        sat_data.loc[:, features] = scaler.transform(sat_data.loc[:, features])
+
+        sat_datas_train[sat_id] = sat_data
+
+        if not os.path.exists(f'models//{sat_id}'):
+            os.makedirs(f'models//{sat_id}')
+        torch.save(scaler, f'models//{sat_id}//StandardScaler-full')
+
+    return sat_datas_train
 
 
 def make_prediction(model, data, method='separated'):

@@ -1,4 +1,4 @@
 build:
-
+	echo hello
 run:
-	python predictor.py
+	python3 ./predictor.py
