@@ -1,1 +1,0 @@
-{"lr": 0.001, "eps": 1e-05, "seq_len": 5, "hidden_dim": 40, "epoch": 10, "num_layers": 2}
